@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Conceptual civilian radar situational-awareness interface demo.">
+  <title>Civilian Radar System</title>
+  <style>
+* { box-sizing: border-box; }
+:root {
+  --bg: #08111f; --panel: #111e30; --panel2: #16263b; --line: #263b55;
+  --text: #edf5ff; --muted: #9eb0c7; --cyan: #55d6e8; --green: #5ee0a0;
+  --amber: #ffc66d;
+}
+body {
+  margin: 0; background: radial-gradient(circle at top right, #142b43, var(--bg) 48%);
+  color: var(--text); font: 15px/1.55 Inter, system-ui, -apple-system, Segoe UI, sans-serif;
+}
+.topbar {
+  display: flex; justify-content: space-between; align-items: center; gap: 20px;
+  padding: 28px max(22px, calc((100% - 1240px)/2)); border-bottom: 1px solid var(--line);
+  background: #091524d9;
+}
+h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.35rem); letter-spacing: -.04em; }
+h2 { margin: 0; font-size: 1.12rem; }
+p { margin-top: 7px; }
+.subtitle, .eyebrow { color: var(--muted); }
+.subtitle { margin-bottom: 0; }
+.eyebrow { margin: 0 0 5px; font-size: .69rem; font-weight: 800; letter-spacing: .14em; }
+.status-wrap { display:flex; align-items:center; gap:9px; color:var(--green); font-size:.78rem; font-weight:800; white-space:nowrap; }
+.status-dot, .legend-dot { width:9px; height:9px; display:inline-block; border-radius:50%; background:var(--green); }
+main { max-width:1240px; margin:auto; padding:24px 22px 40px; }
+.notice { padding:13px 16px; border:1px solid #745a2d; background:#382b183d; border-radius:12px; color:#f5d9a6; margin-bottom:18px; }
+.summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:18px; }
+.metric, .panel { background:linear-gradient(145deg, #14243a, #101b2b); border:1px solid var(--line); border-radius:15px; }
+.metric { padding:15px 17px; }
+.metric span { display:block; color:var(--muted); font-size:.78rem; }
+.metric strong { display:block; margin-top:5px; font-size:1.15rem; }
+.safe { color:var(--green); font-size:.94rem !important; }
+.dashboard { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); gap:18px; }
+.panel { padding:19px; min-width:0; }
+.panel-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:15px; }
+.pill { padding:4px 9px; border:1px solid #32627a; border-radius:30px; color:var(--cyan); font-size:.67rem; font-weight:800; }
+.radar-frame { width:100%; max-width:570px; margin:auto; aspect-ratio:1; background:#071624; border:1px solid #1d5260; border-radius:50%; overflow:hidden; }
+canvas { display:block; width:100%; height:100%; }
+.legend { display:flex; flex-wrap:wrap; justify-content:center; gap:15px; margin-top:13px; color:var(--muted); font-size:.75rem; }
+.legend-dot { margin-right:5px; vertical-align:middle; }
+.target-dot { background:var(--green); box-shadow:0 0 8px var(--green); }
+.ring-dot { background:transparent; border:1px solid var(--cyan); }
+.center-dot { background:var(--amber); }
+.table-scroll { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:.82rem; }
+th, td { text-align:left; padding:11px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+th { color:var(--muted); font-size:.7rem; text-transform:uppercase; letter-spacing:.07em; }
+tbody tr { cursor:pointer; }
+tbody tr:hover, tbody tr.selected { background:#1c3650; }
+tbody td:first-child { color:var(--cyan); font-weight:800; }
+.detail-box { margin-top:18px; padding:14px; background:var(--panel2); border:1px solid var(--line); border-radius:10px; }
+.detail-label { color:var(--muted); font-size:.65rem; letter-spacing:.12em; font-weight:800; display:block; }
+.detail-box strong { color:var(--cyan); display:block; margin-top:5px; }
+.detail-box p { color:var(--muted); margin-bottom:0; font-size:.84rem; }
+.lower-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; }
+.pipeline { display:grid; justify-items:center; margin-top:14px; }
+.pipeline div { width:min(100%,330px); text-align:center; padding:8px 12px; background:#172b42; border:1px solid #2a4d68; border-radius:8px; font-size:.83rem; }
+.pipeline b { color:var(--cyan); line-height:1.7; }
+.config-list { margin:13px 0 0; }
+.config-list div { display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid var(--line); font-size:.83rem; }
+.config-list dt { color:var(--muted); }
+.config-list dd { margin:0; color:var(--cyan); text-align:right; }
+.compliance { margin-top:18px; }
+.compliance-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:15px; margin-top:15px; }
+.compliance-grid div { padding:13px; background:var(--panel2); border-radius:9px; }
+.compliance-grid strong { color:var(--cyan); font-size:.85rem; }
+.compliance-grid p { color:var(--muted); font-size:.78rem; margin-bottom:0; }
+footer { max-width:1240px; margin:auto; padding:0 22px 25px; color:var(--muted); font-size:.75rem; }
+@media (max-width:850px) {
+  .dashboard, .lower-grid { grid-template-columns:1fr; }
+  .summary-grid { grid-template-columns:repeat(2,1fr); }
+  .compliance-grid { grid-template-columns:repeat(2,1fr); }
+}
+@media (max-width:520px) {
+  .topbar { align-items:flex-start; flex-direction:column; padding:20px; }
+  main { padding:16px 12px 28px; }
+  .panel { padding:14px; }
+  .compliance-grid { grid-template-columns:1fr; }
+  .metric strong { font-size:1rem; }
+}
+
+  </style>
+  <script defer>
+const tracks = [
+  { id: "TARGET-001", range: 320, azimuth: 38, velocity: 4.2, status: "ACTIVE" },
+  { id: "TARGET-002", range: 610, azimuth: 142, velocity: -2.1, status: "ACTIVE" },
+  { id: "TARGET-003", range: 820, azimuth: 278, velocity: 1.6, status: "ACTIVE" }
+];
+
+const canvas = document.getElementById("radarCanvas");
+const ctx = canvas.getContext("2d");
+const rows = document.getElementById("trackRows");
+
+function drawRadar() {
+  const size = Math.max(280, Math.floor(canvas.parentElement.clientWidth));
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = size * dpr;
+  canvas.height = size * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const s = size, center = s / 2, radius = s * 0.43;
+  ctx.clearRect(0, 0, s, s);
+  ctx.strokeStyle = "rgba(85,214,232,.38)";
+  ctx.lineWidth = 1;
+  for (let i = 1; i <= 4; i++) {
+    ctx.beginPath();
+    ctx.arc(center, center, radius * i / 4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(158,176,199,.75)";
+    ctx.font = "10px system-ui";
+    ctx.fillText(`${i * 250}m`, center + 5, center - radius * i / 4 + 12);
+  }
+  ctx.strokeStyle = "rgba(85,214,232,.2)";
+  for (let deg = 0; deg < 360; deg += 45) {
+    const a = (deg - 90) * Math.PI / 180;
+    ctx.beginPath(); ctx.moveTo(center, center);
+    ctx.lineTo(center + Math.cos(a) * radius, center + Math.sin(a) * radius); ctx.stroke();
+  }
+  ctx.fillStyle = "#ffc66d";
+  ctx.beginPath(); ctx.arc(center, center, 4, 0, Math.PI * 2); ctx.fill();
+
+  tracks.forEach((track, index) => {
+    const a = (track.azimuth - 90) * Math.PI / 180;
+    const r = radius * track.range / 1000;
+    const x = center + Math.cos(a) * r;
+    const y = center + Math.sin(a) * r;
+    ctx.strokeStyle = "rgba(94,224,160,.65)";
+    ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(a) * 24, y + Math.sin(a) * 24); ctx.stroke();
+    ctx.fillStyle = "#5ee0a0";
+    ctx.shadowColor = "#5ee0a0"; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#edf5ff"; ctx.font = "bold 11px system-ui";
+    ctx.fillText(track.id, x + 9, y - 9);
+  });
+}
+
+function renderRows() {
+  rows.innerHTML = tracks.map((t, i) => `
+    <tr data-index="${i}" class="${i === 0 ? "selected" : ""}">
+      <td>${t.id}</td><td>${t.range} m</td><td>${t.azimuth}°</td><td>${t.velocity.toFixed(1)} m/s</td>
+    </tr>`).join("");
+
+  rows.querySelectorAll("tr").forEach(row => {
+    row.addEventListener("click", () => {
+      rows.querySelectorAll("tr").forEach(r => r.classList.remove("selected"));
+      row.classList.add("selected");
+      const t = tracks[Number(row.dataset.index)];
+      document.getElementById("detailName").textContent = t.id;
+      document.getElementById("detailText").textContent =
+        `Range ${t.range} m · Azimuth ${t.azimuth}° · Radial velocity ${t.velocity.toFixed(1)} m/s · Status ${t.status}. Sample data only.`;
+    });
+  });
+}
+
+document.getElementById("activeCount").textContent = String(tracks.length);
+renderRows();
+drawRadar();
+window.addEventListener("resize", drawRadar);
+
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">CONCEPTUAL SYSTEM INTERFACE</p>
+      <h1>Civilian Radar System</h1>
+      <p class="subtitle">Non-personal object tracking · Situational awareness</p>
+    </div>
+    <div class="status-wrap">
+      <span class="status-dot"></span>
+      <span id="systemStatus">DEMO MODE</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="notice">
+      <strong>Simulation only.</strong> The targets and measurements shown are illustrative sample data.
+      This webpage does not connect to radar hardware or transmit radio signals.
+    </section>
+
+    <section class="summary-grid" aria-label="System summary">
+      <article class="metric"><span>Display range</span><strong>1000 m</strong></article>
+      <article class="metric"><span>Active tracks</span><strong id="activeCount">3</strong></article>
+      <article class="metric"><span>Output</span><strong>Kinematic only</strong></article>
+      <article class="metric"><span>Sensor state</span><strong class="safe">TX INHIBITED</strong></article>
+    </section>
+
+    <section class="dashboard">
+      <article class="panel radar-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">LIVE DISPLAY</p><h2>Plan Position Indicator</h2></div>
+          <span class="pill">SIMULATED</span>
+        </div>
+        <div class="radar-frame">
+          <canvas id="radarCanvas" aria-label="Illustrative radar plot with sample targets"></canvas>
+        </div>
+        <div class="legend">
+          <span><i class="legend-dot target-dot"></i> Active track</span>
+          <span><i class="legend-dot ring-dot"></i> Range rings</span>
+          <span><i class="legend-dot center-dot"></i> Sensor position</span>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">TRACK DATA</p><h2>Active targets</h2></div></div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Label</th><th>Range</th><th>Azimuth</th><th>Velocity</th></tr></thead>
+            <tbody id="trackRows"></tbody>
+          </table>
+        </div>
+        <div class="detail-box" id="trackDetail">
+          <span class="detail-label">SELECTED TRACK</span>
+          <strong id="detailName">TARGET-001</strong>
+          <p id="detailText">Select a track in the table to view its sample details.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="lower-grid">
+      <article class="panel">
+        <p class="eyebrow">SYSTEM DESIGN</p>
+        <h2>Processing architecture</h2>
+        <div class="pipeline">
+          <div>Hardware abstraction</div><b>↓</b>
+          <div>Signal processing</div><b>↓</b>
+          <div>Detection &amp; track association</div><b>↓</b>
+          <div>Application &amp; naming logic</div><b>↓</b>
+          <div>Authenticated API</div><b>↓</b>
+          <div>Presentation interface</div>
+        </div>
+      </article>
+      <article class="panel">
+        <p class="eyebrow">ENGINEERING PLACEHOLDERS</p>
+        <h2>Configuration</h2>
+        <dl class="config-list">
+          <div><dt>Frequency</dt><dd>[FREQUENCY] MHz</dd></div>
+          <div><dt>Waveform</dt><dd>[WAVEFORM_TYPE]</dd></div>
+          <div><dt>Transmit power</dt><dd>[POWER] W</dd></div>
+          <div><dt>Antenna</dt><dd>[ANTENNA_TYPE]</dd></div>
+          <div><dt>Naming algorithm</dt><dd>[NAMING_ALGORITHM]</dd></div>
+        </dl>
+      </article>
+    </section>
+
+    <section class="panel compliance">
+      <p class="eyebrow">SAFETY &amp; COMPLIANCE</p>
+      <h2>Operating principles</h2>
+      <div class="compliance-grid">
+        <div><strong>RF authorization</strong><p>Use only frequencies, bandwidths, and power levels permitted by the relevant national authority.</p></div>
+        <div><strong>Hardware safety</strong><p>Independent transmit-power interlock and transmit-inhibit controls must be enforced in hardware.</p></div>
+        <div><strong>Privacy by design</strong><p>Display kinematic tracks only. No imagery, biometrics, facial recognition, or personal identity inference.</p></div>
+        <div><strong>Cybersecurity</strong><p>Use authenticated TLS interfaces, role-based access, audit logs, and secure configuration management.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Conceptual reference interface only · No connection to radar equipment · Range performance requires engineering validation and regulatory approval.
+  </footer>
+</body>
+</html>
